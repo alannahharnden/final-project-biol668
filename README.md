@@ -42,7 +42,7 @@ The provided sequences are for 16S and 18S sequences, with only the 16S for *B.s
  ```
 rRNA_sequences_alignment <- msa(rRNA_sequences, method = "Muscle")
  ```
-You will create a distance matrix and use those calculations to form a neighbor-joining tree, using ``nj``, and then plot simply, using ``type = "phylogram``. Your output should be a phylogram with four branches.
+You will create a distance matrix and use those calculations to form a neighbor-joining tree, using ``nj``, and then plot simply, using ``type = ""phylogram"``. Your output should be a phylogram with four branches.
 
 For the next set of plots (three), you will use three different datasets. These contain OD600 and OD680 reads for each respective heterotroph, and H. lacustris, for their own mini pilot co-culture experiment in a 96-well plate. You will thus use the second through fourth files under "Data." The idea is to use ``sec.axis`` from ggplot to create dual-y-axes, where one reads for OD600, and the other for OD680.
 
