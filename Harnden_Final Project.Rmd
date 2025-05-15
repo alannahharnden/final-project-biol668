@@ -1,0 +1,161 @@
+---
+title: "Harnden_FinalProject_BIOL668"
+author: "Alannah Harnden"
+output: html_document
+---
+
+```{r}
+#Install packages and load in their related libraries to allow for pretty data visualization later on.
+#install.packages("tidyverse")
+#install.packages("ggplot2")
+#BiocManager::install("seqinr")
+#install.packages("ape")
+#BiocManager::install("msa")
+#BiocManager::install("Biostrings")
+#install.packages("cowplot")
+#install.packages("hrbrthemes")
+
+#Load in the related libraries.
+library(ggplot2)
+library(cowplot)
+library(patchwork)
+library(hrbrthemes)
+library(dplyr)
+library("tidyverse")
+library(ggplot2)
+library(BiocManager)
+library(ape)
+library(seqinr)
+library(msa)
+library(Biostrings)
+```
+
+```{r setup, include=FALSE}
+#Read in the data file to the variable, gdata, and ensure the columns (Microorganism, Media, and GrowthRate) are separated properly. 
+gdata <- read.csv("Test_Growth_Data.csv", header=TRUE)
+gdata
+```
+
+```{r}
+#A quick plot to analyze the data and means across different culture media of the four different microorganisms and their respective growth rates. Not very appealing to look at.
+ggplot(gdata, aes(x= Media, y= GrowthRate, fill= Microorganism)) + geom_boxplot() + theme_light()
+```
+
+```{r}
+#Creating a multi-paneled bar plot that compares growth rates across microorganisms in respective culture media. Facet_wrap allows us to scale multiple plots related to one another, and generate something multi-faceted in the first place.
+ggplot(gdata, aes(x=Microorganism, y = GrowthRate, fill = Microorganism)) + geom_bar(stat = "identity", width = 0.75, color="black") + facet_wrap(~ Media, scales = "free_y", ncol = 4, drop=TRUE) + scale_y_continuous(expand = c(0, 0)) + theme_classic() + theme(axis.text.x = element_text(angle = 57, hjust = 1), aspect.ratio = 1) +  labs(y = "Growth Rate")
+```
+
+```{r}
+#Here, I am switching datasets! Rather than reading in a file, I have manually created a string set of DNA sequences for 16S and 18S partial and complete sequences of the specific strains of the species, Bacillus subtilis, Lactobacillus plantarum, Saccharomyces cerevisiae, and Haematococcus lacustris. These have been pulled from NCBI's gene database, and a European database for H. lacustris.
+#**Note that these vary in length.
+rRNA_sequences <- DNAStringSet(c(
+  Bacillus_subtilis168 = "TTATCGGAGAGTTTGATCCTGGCTCAGGACGAACGCTGGCGGCGTGCCTAATACATGCAAGTCGAGCGGACAGATGGGAGCTTGCTCCCTGATGTTAGCGGCGGACGGGTGAGTAACACGTGGGTAACCTGCCTGTAAGACTGGGATAACTCCGGGAAACCGGGGCTAATACCGGATGGTTGTTTGAACCGCATGGTTCAAACATAAAAGGTGGCTTCGGCTACCACTTACAGATGGACCCGCGGCGCATTAGCTAGTTGGTGAGGTAACGGCTCACCAAGGCGACGATGCGTAGCCGACCTGAGAGGGTGATCGGCCACACTGGGACTGAGACACGGCCCAGACTCCTACGGGAGGCAGCAGTAGGGAATCTTCCGCAATGGACGAAAGTCTGACGGAGCAACGCCGCGTGAGTGATGAAGGTTTTCGGATCGTAAAGCTCTGTTGTTAGGGAAGAACAAGTGCCGTTCGAATAGGGCGGTACCTTGACGGTACCTAACCAGAAAGCCACGGCTAACTACGTGCCAGCAGCCGCGGTAATACGTAGGTGGCAAGCGTTGTCCGGAATTATTGGGCGTAAAGGGCTCGCAGGCGGTTTCTTAAGTCTGATGTGAAAGCCCCGGCTCAACCGGGGAGGGTCATTGGAAACTGGGGAACTTGAGTGCAGAAGAGGAGAGTGGAATTCCACGTGTAGCGGTGAAATGCGTAGAGATGTGGAGGAACACCAGTGGCGAAGGCGACTCTCTGGTCTGTAACTGACGCTGAGGAGCGAAAGCGTGGGGAGCGAACAGGATTAGATACCCTGGTAGTCCACGCCGTAAACGATGAGTGCTAAGTGTTAGGGGGTTTCCGCCCCTTAGTGCTGCAGCTAACGCATTAAGCACTCCGCCTGGGGAGTACGGTCGCAAGACTGAAACTCAAAGGAATTGACGGGGGCCCGCACAAGCGGTGGAGCATGTGGTTTAATTCGAAGCAACGCGAAGAACCTTACCAGGTCTTGACATCCTCTGACAATCCTAGAGATAGGACGTCCCCTTCGGGGGCAGAGTGACAGGTGGTGCATGGTTGTCGTCAGCTCGTGTCGTGAGATGTTGGGTTAAGTCCCGCAACGAGCGCAACCCTTGATCTTAGTTGCCAGCATTCAGTTGGGCACTCTAAGGTGACTGCCGGTGACAAACCGGAGGAAGGTGGGGATGACGTCAAATCATCATGCCCCTTATGACCTGGGCTACACACGTGCTACAATGGACAGAACAAAGGGCAGCGAAACCGCGAGGTTAAGCCAATCCCACAAATCTGTTCTCAGTTCGGATCGCAGTCTGCAACTCGACTGCGTGAAGCTGGAATCGCTAGTAATCGCGGATCAGCATGCCGCGGTGAATACGTTCCCGGGCCTTGTACACACCGCCCGTCACACCACGAGAGTTTGTAACACCCGAAGTCGGTGAGGTAACCTTTTAGGAGCCAGCCGCCGAAGGTGGGACAGATGATTGGGGTGAAGTCGTAACAAGGTAGCCGTATCGGAAGGTCGGCTGGATCACCTCCTTT",
+  Lactobacillus_plantarum_001 = "CGAACTCTGGTATTGATTGGTGCTTGCATCATGATTTACATTTGAGTGAGTGGCGAACTGGTGAGTAACACGTGGGAAACCTGCCCAGAAGCGGGGGATAACACCTGGAAACAGATGCTAATACCGCATACCAACTTGGACCGCATGGTCCGAGTTTGAAAGATGGCTTCGGCTATCACTTTTGGATGGTCCCGCGGCGTATTAGCTAGATGGTGGGGTAACGGCTCACCATGGCAATGATACGTAGCCGACCTGAGAGGGTAATCGGCCACATTGGGACTGAGACACGGCCCAAACTCCTACGGGAGGCAGCAGTAGGGAATCTTCCACAATGGACGAAAGTCTGATGGAGCAACGCCGCGTGAGTGAAGAAGGGTTTCGGCTCGTAAAACTCTGTTGTTAAAGAAGAACATATCTGAGAGTAACTGTTCAGGTATTGACGGTATTTAACCAGAAAGCCACGGCTAACTACGTGCCAGCAGCCGCGGTAATACGTAGGTGGCAAGCGTTGTCCGGATTTATTGGGCGTAAAGCGAGCGCAGGCGGTTTTTTAAGTCTGATGTGAAAGCCTTCGGCTCAACCGAAGAAGTGCATCGGAAACTGGGAAACTTGAGTGCAGAAGAGGACAGTGGAACTCCATGTGTAGCGGTGAAATGCGTAGATATATGGAAGAACACCAGTGGCGAAGGCGGCTGTCTGGTCTGTAACTGACGCTGAGGCTCGAAAGTATGGGTAGCAAACAGGATTAGATACCCTGGTAGTCCATACCGTAAACGATGAATGCTAAGTGTTGGAGGGTTTCCGCCCTTCAGTGCTGCAGCTAACGCATTAAGCATTCCGCCTGGGGAGTACGGCCGCAAGGCTGAAACTCAAAGGAATTGACGGGGGCCCGCACAAGCGGTGGAGCATGTGGTTTAATTCGAAGCTACGCGAAGAACCTTACCAGGTCTTGACATACTATGCAAATCTAAGAGATTAGACGTTCCCTTCGGGGACATGGATACAGGTGGTGCATGGTTGTCGTCAGCTCGTGTCGTGAGATGTTGGGTTAAGTCCCGCAACGAGCGCAACCCTTATTATCAGTTGCCAGCATTAAGTTGGGCACTCTGGTGAGACTGCCGGTGACAAACCGGAGGAAGGTGGGGATGACGTCAAATCATCATGCCCCTTATGACCTGGGCTACACACGTGCTACAATGGATGGTACAACGAGTTGCGAACTCGCGAGAGTAAGCTAATCTCTTAAAGCCATTCTCAGTTCGGATTGTAGGCTGCAACTCGCCTACATGAAGTCGGAATCGCTAGTAATCGCGGATCAGCATGCCGCGGTGAATACGTTCCCGGGCCTTGTACACACCGCCCGTCACACCATGAGAGTTTGTAACACCCAAAGTCGGTGGGGTAACCTT",
+  Saccharomyces_cerevisiae = "ATGTCTAAGTATAAGCAATTTATACAGTGAAACTGCGAATGGCTCATTAAATCAGTTATCGTTTATTTGATAGTTCCTTTACTACATGGTATAACTGTGGTAATTCTAGAGCTAATACATGCTTAAAATCTCGACCCTTTGGAAGAGATGTATTTATTAGATAAAAAATCAATGTCTTCGGACTCTTTGATGATTCATAATAACTTTTCGAATCGCATGGCCTTGTGCTGGCGATGGTTCATTCAAATTTCTGCCCTATCAACTTTCGATGGTAGGATAGTGGCCTACCATGGTTTCAACGGGTAACGGGGAATAAGGGTTCGATTCCGGAGAGGGAGCCGGAGAAACGGCTACCACATCCAAGGAAGGCAGCAGGCGCGCAAATTACCCAATCCTAATTCAGGGAGGTAGTGACAATAAATAACGATACAGGGCCCATTCGGGTCTTGTAATTGGAATGAGTACAATGTAAATACCTTAACGAGGAACAATTGGAGGGCAAGTCTGGTGCCAGCAGCCGCGGTAATTCCAGCTCCAATAGCGTATATTAAAGTTGTTGCAGTTAAAAAGCTCGTAGTTGAACTTTGGGCCCGGTTGGCCGGTCCGATTTTTTCGTGTACTGGATTTCCAACGGGGCCTTTCCTTCTGGCTAACCTTGAGTCCTTGTGGCTCTTGGCGAACCAGGACTTTTACTTTGAAAAAATTAGAGTGTTCAAAGCAGGCGTATTGCTCGAATATATTAGCATGGAATAATAGAATAGGACGTTTGGTTCTATTTTGTTGGTTTCTAGGACCATCGTAATGATTAATAGGGACGGTCGGGGGCATCAGTATTCAATTGTCAGAGGTGAAATTCTTGGATTTATTGAAGACTAACTACTGCGAAAGCATTTGCCAAGGACGTTTTCATTAATCAAGAACGAAAGTTAGGGGATCGAAGATGATCAGATACCGTCGTAGTCTTAACCATAAACTATGCCGACTAGGGATCGGGTGGTGTTTTTTTAATGACCCACTCGGCACCTTACGAGAAATCAAAGTCTTTGGGTTCTGGGGGGAGTATGGTCGCAAGGCTGAAACTTAAAGGAATTGACGGAAGGGCACCACCAGGAGTGGAGCCTGCGGCTTAATTTGACTCAACACGGGGAAACTCACCAGGTCCAGACACAATAAGGATTGACAGATTGAGAGCTCTTTCTTGATTTTGTGGGTGGTGGTGCATGGCCGTTCTTAGTTGGTGGAGTGATTTGTCTGCTTAATTGCGATAACGAACGAGACCTTAACCTACTAAATAGTGGTGCTAGCATTTGCTGGTTATCCACTTCTTAGAGGGACTATCGGTTTCAAGCCGATGGAAGTTTGAGGCAATAACAGGTCTGTGATGCCCTTAGACGTTCTGGGCCGCACGCGCGCTACACTGACGGAGCCAGCGAGTCTAACCTTGGCCGAGAGGTCTTGGTAATCTTGTGAAACTCCGTCGTGCTGGGGATAGAGCATTGTAATTATTGCTCTTCAACGAGGAATTCCTAGTAAGCGCAAGTCATCAGCTTGCGTTGATTACGTCCCTGCCCTTTGTACACACCGCCCGTCGCTAGTACCGATTGAATGGCTTAGTGAGGCCTCAGGATCTGCTTAGAGAAGGGGGCAACTCCATCTCAGAGCGGAGAATTTGGACAAACTTGGTCATTTAGAGGAACTAAAAGTCGTAACAAGGTTTCCGTAGGTGAACC",
+  Haematococcus_lacustris_CCAP3413 = "TGGTTGATCCTGCCAGTAGTCATATGCTTGTCTCAAAGATTAAGCCATGCATGTCTAAGTATAAACTGCTTATACGGTGAAACTGCGAATGGCTCATTAAATCAGTTATAGTTTATTTGATGGTACTTTACTCGGATAACCGTAGTAATTCTAGAGCTAATACGTGCGTATATCCCGACTTCTGGAAGGGACGTATTTATTAGATAAAAGGCCAGCCGGGCTTGCCCGACCTATGGCGAATCATGATAACTTCACGAATCGCACGGCCTTGCGCCGGCGATGTTTCATTCAAATTTCTGCCCTATCAACTTTCGATGGTAGGATAGAGGCCTACCATGGTGGTAACGGGTGACGGAGGATTAGGGTTCGATTCCGGAGAGGGAGCCTGAGAAACGGCTACCACATCCAAGGAAGGCAGCAGGCGCGCAAATTACCCAATCCCGACACGGGGAGGTAGTGACAATAAATAACAATACCGGGCATCAATGTCTGGTAATTGGAATGAGAACAATTTAAATCCCTTAACGAGTATCCATTGGAGGGCAAGTCTGGTGCCAGCAGCCGCGGTAATTCCAGCTCCAATAGCGTATATTTAAGTTGTTGCAGTTAAAAAGCTCGTAGTTGGATTTCGGGTGGGTTCCAGCGGTCTGCCTCTGGTATGTACTGCTGTGGCCTACCTTTCTGCCGGGGACGTGTTCCTGGGCTTCATTGTCCGGGACTCGAATTCGGCGAGGATACTTTGAGTAAAACAGCGTGTTCAAAGCAAGCCTACGCTCTGAATGCATTAGCATGGAATATCACGATAGGACTCTGGCCTATCTTGTTGGTCTGTAGGACCGGAGTAATGATTAAGAGGGACAGTCGGGGGCATTCGTATTTCATTGTCAGAGGTGAAATTCTTGGATTTATGAAAGACGAACTTCTGCGAAAGCATTTGCCAAGGATGTTTTCATTAATCAAGAACGAAAGTTGGGGGCTCGAAGACGATTAGATACCGTCGTAGTCTCAACCATAAACGATGCCGACTAGGGATTGGCAGGTGTTTTATTGATGACCCTGCCAGCACCTTATGAGAAATCAAAGTTTTTGGGTTCCGGGGGGAGTATGGTCGCAAGGCTGAAACTTAAAGGAATTGACGGAAGGGCACCACCAGGCGTGGAGCCTGCGGCTTAATTTGACTCAACACGGGAAAACTTACCAGGTCCAGACACGGGAAGGATTGACAGATTGAGAGCTCTTTCTTGATTCTGTGGGTGGTGGTGCATGGCCGTTCTTAGTTGGTGGGTTGCCTTGTCAGGTTGATTCCGGTAACGAACGAGACCTCAGCCTGCTAAATAGTCAAGCGTACCTTGGTACGCGCCTGACTTCTTAGAGGGACTATTGACGTTTAGTCAGTGGAAGTGTGAGGCAATAACAGGTCTGTGATGCCCTTAGATGTTCTGGGCCGCACGCGCGCTACACTGATGCATTCAGCGAGCCTATCCTTGGCCGAGAGGTCCGGGTAATCTTTGAAACTGCATCGTGATGGGGATAGATTATTGCAATTATTAGTCTTCAACGAGGAATGCCTAGTAAGCGCGAGTCATCAGCTCGCGTTGATTACGTCCCTGCCCTTTGTACACACCGCCCGTCGCTCCTACCGATTGGGTGTGCTGGTGAAGTGTTCGGATTGACTTCAGCGGTGGGCAACCTCTGCTGTCGTTGAGAAGATCATTAAACCCTCCCACCTAGAGGAAGGAGAAGTCGTAACAAGGTCTCCGTAGGTGAACCAGCGGAGGGATCATTGAATCTATCAATAACTTAACCGTGAACCTCATTTAGCGGCTCTCTGGCATATACCAAACACACGTGCAATTTTATGCAACGTTTATACCGATGTATACTAGTGCGTGTGGTGTCATTGCCTTTGGCGCATTTAGCGCACAAAGGGGCTGGGGGGGAAACCTTTGCCTCAGCTGGCCACATCCCCCATTTCCCATTTTTATGGGATGGGTGCGGTGTGCGTCGGTTGTGGTTCCCAGTCGGTCTTCTTTTATTCAACACCATTCCTTATCAATCATTTCTTAAGTTTGATGTTGGATCAGTAGTACTGACCTACACATTAACCATGGACAACTCTCAACAACGGATATCTTGGCTCTCGCAACGATGAAGAACGCAGCGAAATGCGAAACGTAGTGTGAATTGCAGAATTCCGTGAATCATCAAATCTTTGAACGCATATTGCGCTCGAAGCTTCGGCTAAGAGCATGTCTGCCTCAGCGTCGGGTTAACATCGCTTGCTTATCTACCAAAGGTATAGCAACGGACCTGACCCTTCCAATCAAGTTAGCATTAATGTGGTTGGATTGGTTGAAGTGCATAGGCAATTAGTTGAAGGCCCATCACGGCCACGTTTTGGTTAGGCAGAGCTTCGGCTAGCTCCTAAACGTTGGCTTGGATTTTCAATGCCCTTCCAGGAGTGGCCTAGAAACAGGCCCCTACCCCATGTACTCGAC"
+))
+```
+```{r}
+# I then converted the provided list of sequences (rRNA_sequences) into a string set that can be read with the Bioconductor package, designed for taking in biological data, re-assigning to the same variable name.
+rRNA_sequences <- DNAStringSet(rRNA_sequences)
+```
+```{r}
+#Perform a multiple sequence alignment on those newly converted (format-wise) sequence strings.
+rRNA_sequences_alignment <- msa(rRNA_sequences, method = "Muscle")
+```
+```{r}
+
+#Here, I have converted that aligned sequence into another type of sequence alignment, from the package seqinr. Seqinr allows us to use other methods, such as as.DNAbin.
+rRNA_sequences_alignment <- msaConvert(rRNA_sequences_alignment, type = "seqinr::alignment")
+aligned_rRNA_DNAbin <- as.DNAbin(aligned_rRNA_seqs)
+```
+```{r}
+#The distance matrix is created, based on the aligned DNA sequences. The model "raw" denotes we are working with the raw sequences, nothing has been adjusted.
+rRNA_dist_matrix <- dist.dna(aligned_rRNA_DNAbin, model = "raw")
+```
+```{r}
+#From those calculations of that created distance matrix, generate the information that will product the tree once plotted.
+rRNAbased_nj_tree <- nj(rRNA_dist_matrix)
+rRNAbased_nj_tree
+```
+
+```{r}
+#Plotting the generated tree in the previous chunk. Phylogram is chosen here to specifically include branch length, which demonstrates evolutionary change over time.
+plot(rRNAbased_nj_tree,
+     type = "phylogram",
+     edge.color = "black",
+     tip.color = "black",
+     edge.width = 1.5,
+     cex = 1.0)
+```
+
+```{r}
+#Here, I am using new data. I will create 2-y-axis co-culture plots, between heterotrophs and the microalgae, Haematococcus lacustris.
+
+#I begin with reading in the new dataset, for Haematococcus and Bacillus
+co_hb <- read.csv("Co-Culture-Haem-andBacillus.csv", header=TRUE)
+co_hb
+
+#Combining the two plots' lines, and specifically using an interesting function, sec.axis, which allows me to generate a second axis on the right-hand side, with a unique label. Additionally, it may be confusing why "color" in "aes" is set to the labels of the legend. This is because we are creating a group that would usually stand as the label for the legend: and overcoming it when we create the values and manually scale in the last set of parentheses for this plot.
+ggplot(co_hb, aes(x=Day)) + geom_line(aes(y=Bacillus_600, color = "Bacillus subtilis (OD600)")) +  geom_line(aes(y=Haematococcus_680, color = "Haematococcus lacustris (OD680)")) + scale_y_continuous( name = "Optical Density at 600 nm", sec.axis = sec_axis(name = "Optical Density at 680 nm", ~.)) + scale_color_manual(name = "Microorganism", values = c("Bacillus subtilis (OD600)" = "deepskyblue", "Haematococcus lacustris (OD680)" = "mediumseagreen")) 
+
+#Begin with reading in new data, for Haematococcus and Saccharomyces.
+co_hs <- read.csv("co_hs.csv", header=TRUE)
+co_hs
+
+#Combining the two plots' lines, and I essentially use the same code as above, just changing out the dataset and heterotroph.
+ggplot(co_hs, aes(x=Day)) + geom_line(aes(y=Saccharomyces_600, color = "Saccharomyces cerevisiae (OD600)")) +  geom_line(aes(y=Haematococcus_680, color = "Haematococcus lacustris (OD680)")) + scale_y_continuous( name = "Optical Density at 600 nm", sec.axis = sec_axis(name = "Optical Density at 680 nm", ~.)) + scale_color_manual(name = "Microorganism", values = c("Saccharomyces cerevisiae (OD600)" = "coral2", "Haematococcus lacustris (OD680)" = "mediumseagreen")) 
+
+
+#Begin with reading in new data, for Haematococcus and Lactobacillus.
+co_hl <- read.csv("co_hl.csv", header=TRUE)
+co_hl
+
+#Combining the two plots' lines and programming for the dual-line, dual-y-axis plot as above. This is a method provided by ggplot!
+ggplot(co_hl, aes(x=Day)) + geom_line(aes(y=Lactobacillus_600, color = "Lactobacillus plantarum (OD600)")) +  geom_line(aes(y=Haematococcus_680, color = "Haematococcus lacustris (OD680)")) + scale_y_continuous( name = "Optical Density at 600 nm", sec.axis = sec_axis(name = "Optical Density at 680 nm", ~.)) + scale_color_manual(name = "Microorganism", values = c("Lactobacillus plantarum (OD600)" = "plum", "Haematococcus lacustris (OD680)" = "mediumseagreen")) 
+
+```
+
+```{r}
+#Here, I'd like to create a standard growth curve plot, a fancier version of what could be done on Excel.
+#Reading in a new dataset, with heterotrophic co-culture growth (in pairs), as designated by the labels BS_LP, BS_SC, and SC_LP.
+het_cocultures <- read.csv("heterotrophic_coculture.csv", header=TRUE)
+head(het_cocultures)
+het_cocultures
+
+#Converting Time into a factor, as opposed to numeric.
+het_cocultures$Time <- as.factor(het_cocultures$Time)
+
+#Calculating statistics, such as averages and standard deviation. This is fancier given the column style, long layout of my file, than a simple use of the mean() function.
+avgerage = aggregate(OD_600 ~ Time + Coculture, het_cocultures, mean)
+standard_dev <- aggregate(OD_600 ~ Time + Coculture, het_cocultures, sd)
+avgerage$standard_dev <- standard_dev$OD_600
+
+#Now, I plot my three lines, with the error bars provided from the average and standard deviation calculations.
+ggplot(avg, aes(x = Time, y = OD_600, color = Coculture)) + 
+  geom_line() + geom_point(size=1) + geom_errorbar(aes(ymin = OD_600 - sd, ymax = OD_600 + sd), width = 0.2) + labs(title = "Heterotrophic Pairs: Growth in BBMG", x = "Time (h)", y = "OD600") + theme_minimal() 
+```
+
+```{r}
+#Finishing off the notebook with some summary statistics! I use the dataset from the previous growth curve I juse generated above. Quick anova on the relevance of the microorganismal groups (co-cultures) and the time on the recorded optical densities, at 600 nm.
+
+#Here is how to complete a one-way ANOVA, for the impact of Coculture alone, on OD. p-value reads: very significant.
+anova_based_on_coculture <- aov(OD_600 ~ Coculture, data = het_cocultures)
+summary(anova_based_on_coculture)
+
+#Here is completed the next one-way ANOVA, for the factor of Time alone, on OD. p-value reads: very significant.
+anova_based_on_time <- aov(OD_600 ~ Time, data = het_cocultures)
+summary(anova_based_on_time)
+
+#Two-way ANOVA, investigating the relevance of both Coculture and Time in combination on OD. p-value reads: non-significant.
+anova_based_on_both <- aov(OD_600 ~ Coculture * Time, data = het_cocultures)
+summary(anova_based_on_both)
+
+#Based on the conclusions from the anova, I decided to look at some correlation tests of these factors individually on one another. 
+#First, the Time factor must be returned to numeric, as it was converted earlier into a factor. 
+het_cocultures$Time <- as.factor(het_cocultures$Time)
+
+#Then, run correlation test. Only on Time here, not Coculture, since that is what is numeric in value.
+cor.test(het_cocultures$Time, het_cocultures$OD_600)
+```
