@@ -28,7 +28,7 @@ This repository contains the code and notebook generated for the final project i
 ## Instructions 
 Install and load in all necessary packages. This project focuses on data visualization, so much of these packages relate to that exactly.
 
-Begin by reading in the Test_Growth_Data.csv, in order to use ``sec.axis`` and ``facet_wrap`` from ggplot. Code is contained within the private notebook that guides you through first creating a quick simplot boxplot with ggplot, so you may recall the format for plotting.
+Begin by reading in the Test_Growth_Data.csv, in order to use ``facet_wrap`` from ggplot. Code is contained within the private notebook that guides you through first creating a quick simplot boxplot with ggplot, so you may recall the format for plotting.
 
 ```
 ggplot(gdata, aes(x= Media, y= GrowthRate, fill= Microorganism)) + geom_boxplot() + theme_light()
